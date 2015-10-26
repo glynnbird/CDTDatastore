@@ -112,12 +112,20 @@ There's a method on the `CDTDatastore` interface:
 ```objc
 - (NSArray*)getConflictedDocumentIds;
 ```
+```swift
+public func getConflictedDocumentIds() -> [AnyObject]!
+```
 
 This method returns an iterator over the document IDs:
 
 ```objc
 for (NSString *docId in [datastore getConflictedDocumentIds]) {
     NSLog(@"%@", docId);
+}
+```
+```swift
+for docId in datastore.getConflictedDocumentIds()  {
+    print(docId)
 }
 ```
 
@@ -138,6 +146,14 @@ The `CDTConflictResolver` interface has one method:
 
 @end
 ```
+```swift
+public protocol CDTConflictResolver {
+
+    public func resolve(docId: String!, conflicts: [AnyObject]!)
+    -> CDTDocumentRevision!
+
+}
+```
 
 This method is passed the docId and the list of active revisions,
 including the current winning revision. A rather simplistic
@@ -154,6 +170,14 @@ would be:
 }
 
 @end
+```
+```swift
+class CDTPickFirstResolver : NSObject, CDTConflictResolver {
+
+    func resolve(docId: String!, conflicts: [AnyObject]!) -> CDTDocumentRevision! {
+        return  conflicts.first! as! CDTDocumentRevision
+    }
+}
 ```
 
 Clearly, in the general case this will discard the user's data(!),
@@ -172,6 +196,16 @@ It is also possible to return a `CDTDocumentRevision` from
     rev.body = /* ...update body, perhaps with data from the other conflicts */
     rev.attachments = /* ...you can also create/update/delete attachments */
     return rev;
+}
+```
+```swift
+class CDTMergeResolver : NSObject, CDTConflictResolver {
+    func resolve(docId: String!, conflicts: [AnyObject]!) -> CDTDocumentRevision! {
+        let rev = conflicts.first!
+        rev.body // ...update body, perhaps with data from the other conflicts
+        rev.attachments // ...you can also create/update/delete attachments
+        return rev as! CDTDocumentRevision
+    }
 }
 ```
 
@@ -231,6 +265,20 @@ via a timer to periodically fix up any conflicts:
     }
 }
 ```
+```swift
+public func resolveConflictsInDatastore(datastore:CDTDatastore)
+{
+    let pickFirst = CDTPickFirstResolver()
+    for docId in datastore.getConflictedDocumentIds() {
+        do {
+            try datastore.resolveConflictsForDocument(docId as! String,
+                resolver: pickFirst)
+        } catch {
+            //handle error
+        }
+    }
+}
+```
 
 How often this should run depends on your application, but you'd probably
 want to consider:
@@ -240,4 +288,3 @@ want to consider:
 
 We're always looking at ways to improve the experience around conflicts,
 so be sure to file an issue if you have suggestions or problems.
-
