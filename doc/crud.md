@@ -31,6 +31,21 @@ CDTDatastoreManager *manager =
 [[CDTDatastoreManager alloc] initWithDirectory:path
                                          error:&error];
 ```
+```swift
+do {
+
+    let fileManager = NSFileManager.defaultManager()
+
+    let documentsDir = fileManager.URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask).last!
+
+    let storeURL = documentsDir.URLByAppendingPathComponent("cloudant-sync-datastore")
+    let path = storeURL.path
+
+    let manager = try CDTDatastoreManager(directory: path)
+} catch {
+    print(error)
+}
+```
 
 Once you've a manager set up, it's straightforward to create datastores:
 
@@ -39,6 +54,10 @@ CDTDatastore *ds = [manager datastoreNamed:@"my_datastore"
                                      error:&error];
 CDTDatastore *ds2 = [manager datastoreNamed:@"other_datastore"
                                       error:&error];
+```
+```swift
+let ds = try manager.datastoreNamed("my_datastore")
+let ds2 = try manager.datastoreNamed("other_datastore")
 ```
 
 These datastores are persisted to disk between application runs.
@@ -52,6 +71,9 @@ extension data such as indexes (see [index-query.md](doc/index-query.md)):
 ```objc
 BOOL success = [manager deleteDatastoreNamed:@"my_datastore"
                                        error:&error];
+```
+```swift
+try manager.deleteDatastoreNamed("my_datastore")
 ```
 
 It's important to note that this doesn't check there are any active
@@ -88,6 +110,15 @@ rev.body = [@{
 CDTDocumentRevision *revision = [datastore createDocumentFromRevision:rev
                                                                 error:&error];
 ```
+```swift
+let rev = CDTDocumentRevision(docId: "doc1")
+rev.body = ["description":"Buy Milk",
+"completed": false,
+"type":"com.cloudant.sync.example.task"
+]
+let revision = try datastore.createDocumentFromRevision(rev)
+
+```
 
 The only mandatory property to set before calling
 `-createDocumentFromRevision:error:` is the `body`. An ID will be generated
@@ -101,6 +132,10 @@ Once you have created one or more documents, retrieve them by ID:
 NSString *docId = revision.docId;
 CDTDocumentRevision *retrieved = [datastore getDocumentWithId:docId
                                                         error:&error];
+```
+```swift
+let docId = revision.docId
+let retrieved = try datastore.getDocumentWithId(docId)
 ```
 
 You can make updates to `retrieved` which can then be saved to the datastore
@@ -116,6 +151,10 @@ retrieved.body[@"completed"] = @YES;  // Or assign a new NSMutableDictionary
 CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:retrieved
                                                                error:&error];
 ```
+```swift
+retrieved.body["completed"] = true
+let updated = try datastore updateDocumentFromRevision(retrieved)
+```
 
 ### Delete
 
@@ -124,6 +163,9 @@ To delete a document, you need the current revision:
 ```objc
 BOOL deleted = [datastore deleteDocumentFromRevision:updated
                                                error:&error];
+```
+```swift
+try datastore.deleteDocumentFromRevision(updated)
 ```
 
 ## Indexing
@@ -153,6 +195,9 @@ database:
 ```objc
 // Read all documents in one go
 NSArray *documentRevisions = [datastore getAllDocuments];
+```
+```swift
+let documentRevisions = datastore.getAllDocuments()
 ```
 
 ## Using attachments
@@ -191,6 +236,26 @@ rev.attachments[att1.name] = att1;
 CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev
                                                              error:&error];
 ```
+```swift
+// Create a new document
+let rev = CDTDocumentRevision()
+// or get an existing one:
+let rev = try datastore.getDocumentWithId("mydoc")
+
+rev.body = [....]
+
+let att1 = CDTUnsavedFileAttachment(path: "/path/to/image/jpg",
+    name: "cute_cat.jpg",
+    type: "image/jpeg")
+
+// As with the document body, you can replace all the attachments:
+rev.attachments = [att1.name : att1]
+// or just add or update a single one
+rev.attachments[att1.name] = att1
+
+let saved = try datastore.createDocumentFromRevision(rev)
+
+```
 
 When creating new attachments, use `CDTUnsavedFileAttachment` for data you
 already have on disk. Use `CDTUnsavedDataAttachment` when you have an `NSData`
@@ -213,6 +278,21 @@ rev.attachments = [@{ att1.name: att1, att2.name: att2 } mutableCopy];
 CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev
                                                              error:&error];
 ```
+```swift
+let att1 = CDTUnsavedFileAttachment(path: "/path/to/image/jpg",
+    name: "cute_cat.jpg",
+    type: "image/jpeg")
+rev.attachments[att1.name] = att1
+
+let imageData = NSData(contentsOfFile: "/path/to/image.jpg")
+let att2 = CDTUnsavedDataAttachment(data: imageData,
+    name: "cute_cat.jpg",
+    type: "image/jpeg")
+
+let rev = CDTDocumentRevision()
+rev.attachments = [att1.name: att1, att2.name: att2]
+let saved = try datastore.createDocumentFromRevision(rev)
+```
 
 To read an attachment, get the `CDTSavedAttachment` from the `attachments`
 dictionary. Then use `-dataFromAttachmentContent` to read the data:
@@ -222,6 +302,11 @@ CDTDocumentRevision *retrieved = [datastore getDocumentWithId:@"mydoc"
                                                         error:&error];
 CDTAttachment *att = retrieved.attachments[@"cute_cat.jpg"];
 NSData *imageData = [att dataFromAttachmentContent];
+```
+```swift
+let retrieved = try datastore.getDocumentWithId("mydoc")
+let att = retrieved.attachments["cute_cat.jpg"]
+let imageData = att.dataFromAttachmentContent
 ```
 
 To remove an attachment, remove it from the `attachments` dictionary:
@@ -234,12 +319,20 @@ CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:retrieved
                                                                error:&error];
 
 ```
+```swift
+let retrieved = try datastore.getDocumentWithId("mydoc")
+retrieved.attachments.removeValueForKey("cute_cat.jpg")
+let updated = try datastore.updateDocumentFromRevision(retrieved)
+```
 
 To remove all attachments, set the `attachments` property to an empty dictionary
 or `nil`:
 
 ```objc
 update.attachments = nil;
+```
+```swift
+update.attachments = nil
 ```
 
 ## Cookbook
@@ -259,6 +352,10 @@ This is the simplest case as we don't need to worry about previous revisions.
 
     CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
     ```
+    ```swift
+    let rev = CDTDocumentRevision()
+    rev.body = [.....]
+    let saved = try datastore.createDocumentFromRevision(rev)
 
 1. Add a new document to the store with a body and ID, but without attachments.
     ```objc
@@ -267,6 +364,11 @@ This is the simplest case as we don't need to worry about previous revisions.
 
     CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev
                                                                  error:&error];
+    ```
+    ```swift
+    let rev = CDTDocumentRevision("doc1")
+    rev.body = [....]
+    let saved = try datastore.createDocumentFromRevision(rev)
     ```
 
 1. Add a new document to the store with attachments.
@@ -281,6 +383,17 @@ This is the simplest case as we don't need to worry about previous revisions.
     rev.attachments = [@{ att1.name:att1 } mutableCopy];
 
     CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
+    ```
+    ```swift
+    let rev = CDTDocumentRevision("doc1")
+    rev.body = [....]
+
+    let att1 = CDTUnsavedFileAttachment(path: "path",
+        name: "filename",
+        type: "image/jpeg")
+    rev.attachments = [att1.name : att1]
+
+    let saved = try datastore.createDocumentFromRevision(rev)
     ```
 
 1. Add a document with body and attachments, but no ID. You'll get an
@@ -297,6 +410,17 @@ This is the simplest case as we don't need to worry about previous revisions.
 
     CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
     ```
+    ```swift
+    let rev = CDTDocumentRevision()
+    rev.body = [....]
+
+    let att1 = CDTUnsavedFileAttachment(path: "path",
+        name: "filename",
+        type: "image/jpeg")
+    rev.attachments = [att1.name : att1]
+
+    let saved = try datastore.createDocumentFromRevision(rev)
+    ```
 
 1. You can't create a document without a body (body is the only required property).
     ```objc
@@ -305,6 +429,11 @@ This is the simplest case as we don't need to worry about previous revisions.
 
     CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
     // Fails, saved is nil
+    ```
+    ```swift
+    let rev = CDTDocumentRevision("doc1")
+    let saved = try datastore.createDocumentFromRevision(rev)
+    // failed error has been thrown
     ```
 
 ### Updating a document
@@ -321,6 +450,12 @@ rev.body = [@{ ... } mutableCopy];
 
 CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
 ```
+```swift
+let rev = CDTDocumentRevision("doc1")
+rev.body = [....]
+
+let saved = try datastore.createDocumentFromRevision(rev)
+```
 
 We also assume an attachment ready to be added:
 
@@ -330,6 +465,11 @@ CDTUnsavedFileAttachment *att1 = [[CDTUnsavedFileAttachment alloc]
                           name:@"cute_cat.jpg"
                           type:@"image/jpeg"]];
 ```
+```swift
+let att1 = CDTUnsavedFileAttachment(path: "/path/to/image/jpg",
+    name: "cute_cat.jpg",
+    type: "image/jpeg")
+    ```
 
 
 1. Update body for doc that has no attachments, keeping no attachments
@@ -337,6 +477,10 @@ CDTUnsavedFileAttachment *att1 = [[CDTUnsavedFileAttachment alloc]
     saved.body = [@{ ... } mutableCopy];
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
+    ```
+    ```swift
+    saved.body = [....]
+    let updated = try datastore.updateDocumentForRevision(saved)
     ```
 
 1. Update body for doc with no attachments, adding attachments. Here we see
@@ -349,6 +493,12 @@ CDTUnsavedFileAttachment *att1 = [[CDTUnsavedFileAttachment alloc]
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
     ```
+    ```swift
+    saved.body["hello"] = "world"
+    saved.attachments[att1.name] = att1
+
+    let updated = try datastore.updateDocumentForRevision(saved)
+    ```
 
 1. Update body for doc with no attachments, removing attachments dictionary
    entirely.
@@ -359,6 +509,12 @@ CDTUnsavedFileAttachment *att1 = [[CDTUnsavedFileAttachment alloc]
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
     ```
+    ```swift
+    saved.body["hello"] = "world"
+    saved.attachments = nil
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
+    ```
 
 1. Update the attachments without changing the body, add attachments to a doc
    that had none.
@@ -368,6 +524,11 @@ CDTUnsavedFileAttachment *att1 = [[CDTUnsavedFileAttachment alloc]
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
     ```
+    ```swift
+    saved.attachments[att1.name] = att1
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
+    ```
 
 1. Update attachments by copying from another revision.
     ```objc
@@ -376,6 +537,12 @@ CDTUnsavedFileAttachment *att1 = [[CDTUnsavedFileAttachment alloc]
 
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
+    ```
+    ```swift
+    let anotherDoc = datastore.getDocumentForId("anotherId")
+    saved.attachments = anotherDoc.attachments
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
     ```
 
 1. Updating a document using an outdated source revision causes a conflict
@@ -389,6 +556,15 @@ CDTUnsavedFileAttachment *att1 = [[CDTUnsavedFileAttachment alloc]
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
     // Updated should be nil, and error should be set/exception thrown
+    ```
+    ```swift
+    saved.body = [....]
+    try datastore.updateDocumentFromRevision(saved)
+
+    saved.body = [...]
+    let updated = try datastore.updateDocumentFromRevision(saved)
+
+    // scope will change since an error will have been thrown
     ```
 
 
@@ -405,6 +581,15 @@ rev.attachments = [@{ att1.name:att1, att2.name:att2, att3.name:att3 } mutableCo
 
 CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
 ```
+```swift
+let rev = CDTDocumentRevision("doc1")
+rev.body = [....]
+let att1 = CDTUnsavedFileAttachment(/* blah */)
+/* set up more attachments */
+rev.attachments = [att1.name:att1, att2.name:att2, att3.name:att3]
+
+let saved = datastore.createDocumentFromRevision(rev)
+```
 
 1. Update body without changing attachments
     ```objc
@@ -412,6 +597,13 @@ CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
 
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
+    // Should have the same attachments
+    ```
+    ```swift
+    saved.body["hello"] = "world"
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
+
     // Should have the same attachments
     ```
 
@@ -422,6 +614,11 @@ CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
     ```
+    ```swift
+    saved.attachments.removeValueForKey(att1.name)
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
+    ```
 
 1. Update the attachments without changing the body, add attachments
     ```objc
@@ -430,6 +627,12 @@ CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
 
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
+    ```
+    ```swift
+    // Create att100 attachment
+    saved.attachments[att100.name] = att100
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
     ```
 
 1. Update the attachments without changing the body, remove all attachments
@@ -440,6 +643,11 @@ CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
     ```
+    ```swift
+    saved.attachments = nil
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
+    ```
 
 1. Update the attachments without changing the body, remove all attachments
    by setting an empty dictionary.
@@ -448,6 +656,11 @@ CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
 
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
+    ```
+    ```swift
+    saved.attachments = []
+
+    let updated = try datastore.updateDocumentFromRevision(saved)
     ```
 
 1. Copy an attachment from one document to another.
@@ -467,6 +680,21 @@ CDTDocumentRevision *saved = [datastore createDocumentFromRevision:rev];
     CDTDocumentRevision *updated = [datastore updateDocumentFromRevision:saved
                                                                    error:&error];
     ```
+    ```swift
+    //Create a revision with attachments
+    let rev = CDTDocumentRevision("doc1")
+    rev.body = [....]
+    let att1 = CDTUnsavedFileAttachment(/* blah */)
+    rev.attachments = [att1.name : att1]
+    let revWithAttachments = try datastore.createDocumentFromRevision(saved)
+
+    // Add attachment to "saved" from "revWithAttachments"
+    let savedAttachment = revWithAttachments.attachments["nameOfAttachment"]
+    saved.attachments = [savedAttachment.name:savedAttachment]
+
+    let updated = try datastore.updateDocumentForRevision(saved)
+    ```
+
 
 ### Creating a document by copying data
 
@@ -485,16 +713,33 @@ document:
     CDTDocumentRevision *updated = [datastore createDocumentFromRevision:rev
                                                                    error:&error];
     ```
+    ```swift
+    let rev = CDTDocumentRevision("doc2")
+    rev.body = saved.body
+    rev.body["hello"] = "world"
+    // Create att100 attachment
+    rev.attachments = saved.attachments
+    rev.attachments[att100.name] = att100;
 
-1. Copy a document's body to a new document, adding or changing a value, 
+    let updated = try datastore.updateDocumentFromRevision(rev)
+    ```
+
+1. Copy a document's body to a new document, adding or changing a value,
    without also copying attachments
     ```objc
     CDTDocumentRevision *rev = [CDTDocumentRevision revisionWithDocId:@"doc2"];
     rev.body = [saved.body mutableCopy];
     rev.body[@"hello"] = @"world";
 
-    CDTDocumentRevision *updated = [datastore createDocumentFromRevision:update
+    CDTDocumentRevision *updated = [datastore createDocumentFromRevision:rev
                                                                    error:&error];
+    ```
+    ```swift
+    let rev = CDTDocumentRevision("doc2")
+    rev.body = saved.body
+    rev.body["hello"] = "world"
+
+    let updated = try datastore.createDocumentFromRevision(rev)
     ```
 
 1. Fail if the document ID is present in the datastore. Note this shouldn't
@@ -512,6 +757,18 @@ document:
                                                                          error:&error];
     // Succeeds
     ```
+    ```swift
+    // Doc ID same as `saved`
+    let rev = CDTDocumentRevision("doc1")
+    rev.body["hello"] = "world"
+
+    let updated = try datastore.createDocumentFromRevision(rev)
+
+    // Fails, error is thrown
+
+    let updated = try other_datastore.createDocumentFromRevision(rev)
+    // Succeeds
+    ```
 
 
 ### Deleting a document
@@ -523,6 +780,10 @@ document:
        CDTDocumentRevision *deleted = [datastore deleteDocumentFromRevision:saved
                                                                       error:&error];
        ```
+       ```swift
+       let saved = datastore.getDocumentForId("doc1")
+       let deleted = try datastore.deleteDocumentFromRevision(saved)
+       ```
 
        This would refuse to delete if `saved` was not a leaf node.
 
@@ -531,6 +792,9 @@ document:
        ```objc
        CDTDocumentRevision *deleted = [datastore deleteDocumentWithId:"@doc1"
                                                                 error:&error];
+       ```
+       ```swift
+       let deleted = try datastore.deleteDocumentWithId("doc1")
        ```
 
     This marks *all* leaf nodes deleted. Make sure to read
