@@ -132,60 +132,57 @@
 
     fetcher.documentChangedBlock = ^(CDTDocumentRevision *revision) {
 
-        CDTLogVerbose(CDTQ_LOGGING_CONTEXT, @"documentChangedBlock: <%@,%@>", indexName,
-                      revision.docId);
+      CDTLogVerbose(CDTQ_LOG_CONTEXT, @"documentChangedBlock: <%@,%@>", indexName, revision.docId);
 
-        [updateBatch addObject:revision];
+      [updateBatch addObject:revision];
 
-        if (updateBatch.count > 500) {
-            CDTQIndexUpdater *self = weakSelf;
-            if (self) {
-                success =
-                    success &&
-                    [self processUpdateBatch:updateBatch forIndex:indexName fieldNames:fieldNames];
-                [updateBatch removeAllObjects];
-            }
-        }
+      if (updateBatch.count > 500) {
+          CDTQIndexUpdater *self = weakSelf;
+          if (self) {
+              success =
+                  success &&
+                  [self processUpdateBatch:updateBatch forIndex:indexName fieldNames:fieldNames];
+              [updateBatch removeAllObjects];
+          }
+      }
 
     };
 
     fetcher.documentWithIDWasDeletedBlock = ^(NSString *docId) {
 
-        CDTLogVerbose(CDTQ_LOGGING_CONTEXT, @"documentWithIDWasDeletedBlock: <%@,%@>", indexName,
-                      docId);
+      CDTLogVerbose(CDTQ_LOG_CONTEXT, @"documentWithIDWasDeletedBlock: <%@,%@>", indexName, docId);
 
-        [deleteBatch addObject:docId];
+      [deleteBatch addObject:docId];
 
-        if (deleteBatch.count > 500) {
-            CDTQIndexUpdater *self = weakSelf;
-            if (self) {
-                success = success && [self processDeleteBatch:deleteBatch forIndex:indexName];
-                [deleteBatch removeAllObjects];
-            }
-        }
+      if (deleteBatch.count > 500) {
+          CDTQIndexUpdater *self = weakSelf;
+          if (self) {
+              success = success && [self processDeleteBatch:deleteBatch forIndex:indexName];
+              [deleteBatch removeAllObjects];
+          }
+      }
 
     };
 
-    fetcher.fetchRecordChangesCompletionBlock =
-        ^(NSString *newSeqVal, NSString *prevSeqVal, NSError *error) {
+    fetcher.fetchRecordChangesCompletionBlock = ^(NSString *newSeqVal, NSString *prevSeqVal,
+                                                  NSError *error) {
 
-        CDTLogVerbose(CDTQ_LOGGING_CONTEXT, @"fetchRecordChangesCompletionBlock: <%@,%@>",
-                      indexName, newSeqVal);
+      CDTLogVerbose(CDTQ_LOG_CONTEXT, @"fetchRecordChangesCompletionBlock: <%@,%@>", indexName,
+                    newSeqVal);
 
-        CDTQIndexUpdater *self = weakSelf;
-        if (self) {
-            // Process any remaining updates and deletes
-            success =
-                success &&
-                [self processUpdateBatch:updateBatch forIndex:indexName fieldNames:fieldNames];
-            [updateBatch removeAllObjects];
-            success = success && [self processDeleteBatch:deleteBatch forIndex:indexName];
-            [deleteBatch removeAllObjects];
+      CDTQIndexUpdater *self = weakSelf;
+      if (self) {
+          // Process any remaining updates and deletes
+          success = success &&
+                    [self processUpdateBatch:updateBatch forIndex:indexName fieldNames:fieldNames];
+          [updateBatch removeAllObjects];
+          success = success && [self processDeleteBatch:deleteBatch forIndex:indexName];
+          [deleteBatch removeAllObjects];
 
-            if (success) {
-                [self updateMetadataForIndex:indexName lastSequence:[newSeqVal longLongValue]];
-            }
-        }
+          if (success) {
+              [self updateMetadataForIndex:indexName lastSequence:[newSeqVal longLongValue]];
+          }
+      }
 
     };
 
